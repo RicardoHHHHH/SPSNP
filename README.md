@@ -51,10 +51,11 @@ You need to run the next script that generates SMILES strings of the products.
 
 ---
 
-## Molecular Decoration
+## Post-Modification
 
 Codes are in **decoration**.  
-This folder contains scripts for **molecular post-modification**, enabling the exploration of structural variants beyond the original reaction outputs.  
+This folder contains scripts for applying **rule-based post-modification**, such as hydroxylation, epoxidation, or double-bond migration.  
+These transformations mimic common biosynthetic modifications and are systematically applied to high-scoring candidate molecules, thereby expanding the predicted chemical space and generating structurally diverse natural product derivatives.  
 
 ---
 

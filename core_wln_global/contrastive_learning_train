@@ -1,0 +1,236 @@
+import tensorflow as tf
+import sys 
+sys.path.append("..") 
+from core_wln_global.mol_graph import max_nb
+from core_wln_global.nn import *
+
+
+# import tensorflow as tf
+from core_wln_global.nn import linearND, linear
+from core_wln_global.mol_graph import atom_fdim as adim, bond_fdim as bdim, max_nb, smiles2graph_list as _s2g
+from core_wln_global.models import *
+from core_wln_global.ioutils_direct import *
+import math, sys, random
+from collections import Counter
+from optparse import OptionParser
+from functools import partial
+import threading
+from multiprocessing import Queue
+import os
+import matplotlib.pyplot as plt
+import numpy as np
+from functools import reduce
+import tensorflow as tf
+from transformers import TFRobertaModel, RobertaTokenizer
+
+# 配置参数
+parser = OptionParser()
+parser.add_option("-t", "--train", dest="train_path", default="../data/train_wg.txt.proc")
+parser.add_option("-m", "--save_dir", dest="save_path", default="model_contrastive_tf")
+parser.add_option("-b", "--batch", dest="batch_size", default=16)
+parser.add_option("-w", "--hidden", dest="hidden_size", default=768)
+parser.add_option("-d", "--depth", dest="depth", default=3)
+parser.add_option("-l", "--max_norm", dest="max_norm", default=5.0)
+parser.add_option("-r", "--rich", dest="rich_feat", default=False)
+opts, args = parser.parse_args()
+
+batch_size = int(opts.batch_size)
+hidden_size = int(opts.hidden_size)
+depth = int(opts.depth)
+max_norm = float(opts.max_norm)
+savepath = opts.save_path
+
+opts,args = parser.parse_args()
+if opts.rich_feat:
+    from core_wln_global.mol_graph_rich import atom_fdim as adim, bond_fdim as bdim, max_nb, smiles2graph_list as _s2g
+else:
+    from core_wln_global.mol_graph import atom_fdim as adim, bond_fdim as bdim, max_nb, smiles2graph_list as _s2g
+smiles2graph_batch = partial(_s2g, idxfunc=lambda x:x.GetIntProp('molAtomMapNumber') - 1)
+
+def count(s):
+    c = 0
+    for i in range(len(s)):
+        if s[i] == ':':
+            c += 1
+    return c
+
+def read_data(path):
+    '''Process data from a text file; bin by number of heavy atoms
+    since that will determine the input sizes in each batch'''
+    bucket_size = [10, 20, 30, 40, 50, 60, 80, 100, 120, 150]
+    buckets = [[] for _ in range(len(bucket_size))]
+    
+    with open(path, 'r') as f:
+        for line in f:
+            r, e = line.strip("\r\n ").split()
+            #smiles_list.append(r)
+            c = count(r)
+            for i in range(len(bucket_size)):
+                if c <= bucket_size[i]:
+                    buckets[i].append((r, e))
+                    break
+
+    for i in range(len(buckets)):
+        random.shuffle(buckets[i])
+
+    head = [0] * len(buckets)
+    avil_buckets = [i for i in range(len(buckets)) if len(buckets[i]) > 0]
+    while True:
+        src_batch, edit_batch = [], []
+        smiles_list = []  # 用于存储分子的文本信息（SMILES表示）# 用于存储与src_batch中化合物一一对应的smiles
+        bid = random.choice(avil_buckets)
+        bucket = buckets[bid]
+        it = head[bid]
+        data_len = len(bucket)
+        for _ in range(batch_size):
+            react = bucket[it][0].split('>')[0]
+            src_batch.append(react)
+            smiles_list.append(react)
+            edits = bucket[it][1]
+            edit_batch.append(edits)
+            it = (it + 1) % data_len
+        head[bid] = it
+
+        yield src_batch, edit_batch, smiles_list  # 返回分子文本信息列表以及相应批次的反应数据
+
+# 加载Chemberta模型和分词器
+tokenizer = RobertaTokenizer.from_pretrained("/hpc2hdd/home/zshao199/Desktop/code/SPNPS/SPNPS_Platform/backend/weight/CB2v2_finusp50_tf")
+chemberta_model = TFRobertaModel.from_pretrained("/hpc2hdd/home/zshao199/Desktop/code/SPNPS/SPNPS_Platform/backend/weight/CB2v2_finusp50_tf")
+def extract_text_features(smiles_list):
+    """
+    使用Chemberta提取分子文本信息对应的文本特征
+    """
+    inputs = tokenizer(smiles_list, return_tensors="tf", padding=True, truncation=True)
+    outputs = chemberta_model(**inputs)
+    # 取[CLS]对应的输出作为句子表示（特征），可根据实际情况调整
+    text_features = outputs.last_hidden_state[:, 0, :].numpy()
+    return tf.convert_to_tensor(text_features)
+
+def contrastive_loss(text_features, graph_features, temperature=0.1):
+    """
+    计算对比学习的InfoNCE损失函数
+    text_features: 通过Chemberta提取的文本特征，形状为 [batch_size, feature_dim_text]
+    graph_features: 通过rcnn_wl_last函数获取的图特征（fp），形状为 [batch_size, feature_dim_graph]
+    temperature: 温度参数，用于调节softmax的平滑程度
+    """
+    batch_size = tf.shape(text_features)[0]
+    # 对文本特征和图特征进行归一化
+    tensor_min_text = tf.reduce_min(text_features)
+    tensor_max_text = tf.reduce_max(text_features)
+    text_features = (text_features - tensor_min_text) / (tensor_max_text - tensor_min_text)
+    tensor_min_graph = tf.reduce_min(graph_features)
+    tensor_max_graph = tf.reduce_max(graph_features)
+    graph_features = (graph_features - tensor_min_graph) / (tensor_max_graph - tensor_min_graph)
+    # text_features = tf.linalg.l2_normalize(text_features, axis=1)
+    # graph_features = tf.linalg.l2_normalize(graph_features, axis=1)
+
+    # 计算正样本相似度（分子自身对应的文本特征和图特征）
+    positive_similarity = tf.reduce_sum(text_features * graph_features, axis=1) / temperature
+    positive_similarity_max = tf.reduce_max(positive_similarity)
+    positive_similarity = positive_similarity/positive_similarity_max
+    positive_similarity = tf.exp(positive_similarity)
+
+    # 计算所有样本对之间的相似度（文本特征与所有图特征、图特征与所有文本特征）
+    similarity_matrix_text_graph = tf.matmul(text_features, graph_features, transpose_b=True) / temperature
+    similarity_matrix_graph_text = tf.matmul(graph_features, text_features, transpose_b=True) / temperature
+    similarity_matrix = tf.concat([similarity_matrix_text_graph, similarity_matrix_graph_text], axis=1)
+    similarity_matrix = tf.concat([tf.expand_dims(positive_similarity, 1), similarity_matrix], axis=1)
+    # 计算每个正样本在所有样本对中的概率（softmax）
+    denominator = tf.reduce_sum(similarity_matrix, axis=1)
+    loss = -tf.math.log(positive_similarity / denominator)
+    return tf.reduce_mean(loss)
+
+# 超参数定义
+batch_size = 16
+learning_rate = 1e-4
+epochs = 500
+
+hidden_size = 768
+depth = 3
+max_nb = 10  
+rcnn_wl_model = RCNNWLModel(batch_size, hidden_size, depth)
+
+# 优化器定义
+optimizer = tf.keras.optimizers.Adam(learning_rate)
+
+
+checkpoint = tf.train.Checkpoint(model=rcnn_wl_model, optimizer=optimizer)
+
+# 恢复最新的检查点
+#checkpoint.restore(tf.train.latest_checkpoint("model_contrastive_tf"))
+#print("rcnn_wl_model 权重已恢复。")
+maxstep = 10000
+for epoch in range(epochs):
+    total_loss = 0
+    data_generator = read_data("../data/train_wg.txt.proc")  # 替换为实际数据文件路径
+    for step, (src_batch, edit_batch, smiles_list) in enumerate(data_generator):
+        if step >= maxstep:
+            break
+        with tf.GradientTape() as tape:
+            src_tuple = smiles2graph_batch(src_batch)
+            cur_bin, cur_label, sp_label = get_all_batch(zip(src_batch, edit_batch))
+            input_atom, input_bond, atom_graph, bond_graph, num_nbs, node_mask = src_tuple
+            if (len(input_atom) != batch_size or 
+                    len(cur_bin) != batch_size or 
+                    len(cur_label) != batch_size):
+                    print("跳过维度不匹配的batch")
+                    continue
+            input_atom = tf.convert_to_tensor(input_atom, dtype=tf.float32)
+            input_bond = tf.convert_to_tensor(input_bond, dtype=tf.float32)
+            atom_graph = tf.convert_to_tensor(atom_graph, dtype=tf.float32)
+            bond_graph = tf.convert_to_tensor(bond_graph, dtype=tf.float32)
+            num_nbs = tf.convert_to_tensor(num_nbs, dtype=tf.int32)
+            node_mask = tf.convert_to_tensor(node_mask, dtype=tf.float32)
+            expected_atom_shape = [batch_size, None, adim]
+            expected_bond_shape = [batch_size, None, bdim]
+            expected_atom_graph_shape = [batch_size, None, max_nb, 2]
+            expected_bond_graph_shape = [batch_size, None, max_nb, 2]
+            expected_num_nbs_shape = [batch_size, None]
+            expected_node_mask_shape = [batch_size, None]
+            input_atom.set_shape(expected_atom_shape)
+            input_bond.set_shape(expected_bond_shape)
+            atom_graph.set_shape(expected_atom_graph_shape)
+            bond_graph.set_shape(expected_bond_graph_shape)
+            num_nbs.set_shape(expected_num_nbs_shape)
+            node_mask.set_shape(expected_node_mask_shape)
+            atom_graph = tf.cast(atom_graph, tf.int32)
+            bond_graph = tf.cast(bond_graph, tf.int32)
+            num_nbs = tf.cast(num_nbs, tf.int32)
+            node_mask = tf.expand_dims(node_mask, -1)
+
+            graph_inputs = (input_atom, input_bond, atom_graph, bond_graph, num_nbs, node_mask)
+            graph_kernels, graph_fp = rcnn_wl_model(graph_inputs)
+            #smiles_list 变成batchsize长度
+            # if len(smiles_list) > batch_size:
+            #     smiles_list = smiles_list[:batch_size]
+            # elif len(smiles_list) < batch_size:
+            #     smiles_list += [''] * (batch_size - len(smiles_list)) 
+            text_features = extract_text_features(smiles_list)
+            loss = contrastive_loss(text_features, graph_fp)
+        
+        train_vars = rcnn_wl_model.trainable_variables
+        gradients = tape.gradient(loss, train_vars)
+        
+        # 梯度裁剪
+        gradients = [tf.clip_by_value(grad, -1.0, 1.0) for grad in gradients]
+        
+        optimizer.apply_gradients(zip(gradients, train_vars))
+        total_loss += loss.numpy()
+        # saver = tf.compat.v1.train.Saver(var_list=train_vars, max_to_keep=None)
+        # saver.save(tf.compat.v1.Session(), "rcnn_wl_model_weights.ckpt")
+        # checkpoint = tf.train.Checkpoint(model=rcnn_wl_model, optimizer=optimizer)
+        ##checkpoint.save("rcnn_wl_model_weights_2000/ckpt")
+        #print("rcnn_wl_model 权重已保存。")
+        print(f'step {step + 1}/{maxstep}, Loss: {loss }')
+    checkpoint = tf.train.Checkpoint(model=rcnn_wl_model, optimizer=optimizer)
+    checkpoint_dir = os.path.join(savepath, f"epoch_{epoch + 1}")
+    checkpoint.save(checkpoint_dir)
+    print("rcnn_wl_model 权重已保存。")
+    print(f'Epoch {epoch + 1}/{epochs}, Average Loss: {total_loss / (step + 1)}')
+    #print(f'Epoch {epoch + 1}/{epochs}, Loss: {total_loss / (step + 1)}')
+
+# 保存rcnn_wl_last的权重，这里假设保存路径为 "rcnn_wl_last_weights.ckpt"
+# 保存 rcnn_wl_model 的权重，这里假设保存路径为 "rcnn_wl_model_weights.ckpt"，你可根据实际需求调整
+# saver = tf.compat.v1.train.Saver(var_list=train_vars, max_to_keep=None)
+# saver.save(tf.compat.v1.Session(), "rcnn_wl_model_weights.ckpt")
+# print("rcnn_wl_model 权重已保存。")

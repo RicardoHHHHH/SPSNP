@@ -59,6 +59,10 @@ This folder contains scripts for **molecular post-modification**, enabling the e
 
 ## Data
 
-All required data files are in the **data** folder:  
-- `train.txt.proc`  
-- `test.txt.proc`  
+The **data** folder is organized into two parts:  
+
+- **Training Data**: contains the processed datasets used for model training, such as  
+  - `train.txt.proc`  
+  - `test.txt.proc`  
+
+- **Chemoinformatics analysis**: includes the generated experimental results, predicted structures, and downstream chemoinformatics analyses.  

@@ -1,4 +1,5 @@
-# Reaction Prediction with NP-CLIP and Post-Modification
+# Smart Prediction System for Natural Product Structures (SPSNP)
+
 
 This repository implements the **SPSNP framework** for natural product structure prediction.  
 Our approach integrates **NP-CLIP multimodal contrastive learning** (combining ChemBERTa-2 for SMILES and a Weisfeiler–Lehman Network (WLN) for molecular graphs), followed by **reaction center prediction**, **candidate generation and scoring** with a Weisfeiler–Lehman Difference Network (WLDN), and **rule-based post-modification**.  

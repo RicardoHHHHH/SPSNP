@@ -1,0 +1,68 @@
+========================================================================
+Maximum Tanimoto Score (MTS) Statistics Report
+Query library: virtual_compounds.txt  (3667 compounds)
+Fingerprint: Morgan (radius=1, nBits=1024)
+========================================================================
+
+Reference Library                 N_ref     Mean   Median      Std      Min      Max       Q1       Q3      IQR
+----------------------------------------------------------------------------------------------------------------------
+Synthetics (ChEMBL)              453770   0.4886   0.4667   0.0837   0.3611   0.8857   0.4286   0.5244   0.0958
+UNPD                              41806   0.5185   0.5111   0.0619   0.3721   0.9000   0.4737   0.5532   0.0795
+Natural Phloroglucinols             580   0.6115   0.6000   0.0911   0.3636   1.0000   0.5455   0.6591   0.1136
+
+
+--------------------------------------------------
+Reference Library: Synthetics (ChEMBL)
+  Source file      : chembl-syn.txt
+  N (query)        : 3667
+  Mean MTS         : 0.4886
+  Std              : 0.0837
+  Min              : 0.3611
+  Q1  (25th pctl)  : 0.4286
+  Median (50th)    : 0.4667
+  Q3  (75th pctl)  : 0.5244
+  Max              : 0.8857
+  IQR (Q3 - Q1)    : 0.0958
+  Whisker low      : 0.3611
+  Whisker high     : 0.6682
+  %% MTS >= 0.7    : 3.1%
+  %% MTS >= 0.8    : 0.5%
+  %% MTS >= 0.9    : 0.0%
+
+--------------------------------------------------
+Reference Library: UNPD
+  Source file      : unpd.txt
+  N (query)        : 3667
+  Mean MTS         : 0.5185
+  Std              : 0.0619
+  Min              : 0.3721
+  Q1  (25th pctl)  : 0.4737
+  Median (50th)    : 0.5111
+  Q3  (75th pctl)  : 0.5532
+  Max              : 0.9000
+  IQR (Q3 - Q1)    : 0.0795
+  Whisker low      : 0.3721
+  Whisker high     : 0.6725
+  %% MTS >= 0.7    : 1.0%
+  %% MTS >= 0.8    : 0.1%
+  %% MTS >= 0.9    : 0.0%
+
+--------------------------------------------------
+Reference Library: Natural Phloroglucinols
+  Source file      : Myrtaceae_phloroglucinols.txt
+  N (query)        : 3667
+  Mean MTS         : 0.6115
+  Std              : 0.0911
+  Min              : 0.3636
+  Q1  (25th pctl)  : 0.5455
+  Median (50th)    : 0.6000
+  Q3  (75th pctl)  : 0.6591
+  Max              : 1.0000
+  IQR (Q3 - Q1)    : 0.1136
+  Whisker low      : 0.3750
+  Whisker high     : 0.8295
+  %% MTS >= 0.7    : 14.9%
+  %% MTS >= 0.8    : 3.7%
+  %% MTS >= 0.9    : 1.1%
+
+========================================================================

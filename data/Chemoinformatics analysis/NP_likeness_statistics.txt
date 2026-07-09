@@ -1,0 +1,77 @@
+================================================================================
+NP-likeness Score Distribution Statistics Report
+================================================================================
+
+Library                               N     Mean   Median      Std      Min      Max       Q1       Q3      IQR    MDV_x    MDV_y
+------------------------------------------------------------------------------------------------------------------------------------------
+Synthetics (ChEMBL)              897752   -0.899   -1.017    0.923   -4.083    4.127   -1.531   -0.401    1.130    -1.19     0.50
+UNPD                              41806    1.177    1.141    0.962   -2.508    4.008    0.534    1.792    1.258     1.17     0.44
+Natural Phloroglucinols             580    2.037    2.103    0.379    0.716    2.777    1.808    2.329    0.521     2.23     1.08
+Virtual Compounds                  3667    2.001    2.015    0.249    0.599    2.723    1.858    2.155    0.298     2.05     1.81
+
+
+--------------------------------------------------
+Library: Synthetics (ChEMBL)
+  N (compounds)         : 897752
+  Mean                  : -0.8994
+  Std                   : 0.9233
+  Min                   : -4.0829
+  Q1  (25th percentile) : -1.5309
+  Median (50th)         : -1.0166
+  Q3  (75th percentile) : -0.4012
+  Max                   : 4.1269
+  IQR (Q3 - Q1)         : 1.1297
+  MDV position (x)      : -1.1892
+  MDV density  (y)      : 0.4965
+  %% score > 0 (NP-like): 14.5%
+  %% score < 0 (Syn-like): 85.5%
+
+--------------------------------------------------
+Library: UNPD
+  N (compounds)         : 41806
+  Mean                  : 1.1775
+  Std                   : 0.9616
+  Min                   : -2.5081
+  Q1  (25th percentile) : 0.5335
+  Median (50th)         : 1.1408
+  Q3  (75th percentile) : 1.7918
+  Max                   : 4.0079
+  IQR (Q3 - Q1)         : 1.2583
+  MDV position (x)      : 1.1652
+  MDV density  (y)      : 0.4399
+  %% score > 0 (NP-like): 90.1%
+  %% score < 0 (Syn-like): 9.9%
+
+--------------------------------------------------
+Library: Natural Phloroglucinols
+  N (compounds)         : 580
+  Mean                  : 2.0366
+  Std                   : 0.3789
+  Min                   : 0.7155
+  Q1  (25th percentile) : 1.8080
+  Median (50th)         : 2.1034
+  Q3  (75th percentile) : 2.3290
+  Max                   : 2.7768
+  IQR (Q3 - Q1)         : 0.5210
+  MDV position (x)      : 2.2302
+  MDV density  (y)      : 1.0803
+  %% score > 0 (NP-like): 100.0%
+  %% score < 0 (Syn-like): 0.0%
+
+--------------------------------------------------
+Library: Virtual Compounds
+  N (compounds)         : 3667
+  Mean                  : 2.0009
+  Std                   : 0.2487
+  Min                   : 0.5987
+  Q1  (25th percentile) : 1.8579
+  Median (50th)         : 2.0155
+  Q3  (75th percentile) : 2.1554
+  Max                   : 2.7227
+  IQR (Q3 - Q1)         : 0.2975
+  MDV position (x)      : 2.0460
+  MDV density  (y)      : 1.8143
+  %% score > 0 (NP-like): 100.0%
+  %% score < 0 (Syn-like): 0.0%
+
+================================================================================
